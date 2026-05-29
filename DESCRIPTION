@@ -1,0 +1,24 @@
+Package: ACFcuda
+Type: Package
+Title: Alternative Compute Framework: CUDA
+Version: 0.1.0
+Authors@R: c(
+    person("Nicholas",
+            "Cooley",
+            email = "Nicholas.Cooley@ul.ie",
+            role = c("aut", "cre"),
+            comment = c(ORCID = "0000-0002-6029-304X"))
+    )
+Description: Minimal and robust infrastructure for integrating CUDA GPU acceleration into R code bases. Currently only being tested on Linux environments.
+Imports: methods
+Suggests: knitr, rmarkdown
+VignetteBuilder: knitr
+License: MIT + file LICENSE
+SystemRequirements: NVIDIA CUDA Toolkit (>= 11.0), CUDA-capable GPU
+Depends: R (>= 4.5.0)
+NeedsCompilation: yes
+ByteCompile: true
+Encoding: UTF-8
+Author: Nicholas Cooley [aut, cre] (ORCID:
+    <https://orcid.org/0000-0002-6029-304X>)
+Maintainer: Nicholas Cooley <Nicholas.Cooley@ul.ie>

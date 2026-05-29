@@ -1,0 +1,195 @@
+#!/bin/sh
+# configure script for linux
+
+# notes:
+# development for this started locally on a small cluster with some A30s
+# and CUDA runtime 12.8
+# not all CUDA versions were forward compatible with newer compilers, so some
+# odd choices were made here to ensure that the development, which was happening
+# mostly within containers on remote resources, was generally more accessible...
+
+# respecting a non-default compiler:
+# if cuda needs a deprecated or different compiler from the default
+# the environment variable AC_ALT_COMPILER will be queried and passed to
+# nvcc's `--compiler_bindir` if it is present
+alt_compiler=${AC_ALT_COMPILER:-""}
+
+# if our script variable is not empty...
+if [ ! -z ${alt_compiler} ]; then
+  echo "======"
+  echo "an alternative compiler appears to be specified"
+  echo "this environment variable is used when the CUDA version and the"
+  echo "system compiler are incompatible"
+  echo "alt compiler: ${alt_compiler}"
+  echo "======"
+fi
+
+# technically uname writes its output to the standard output without -s
+# but being explicit doesn't hurt
+op_sys=$(uname -s)
+
+# create our temp directory, and ensure it gets removed appropriately
+# regardless of how the script exits
+dir01=$(mktemp -d)
+trap 'rm -rf "${dir01}"' EXIT
+
+# variables for our test script
+cuda_test="${dir01}/cuda_test.cu"
+cuda_exec="${dir01}/cuda_test"
+
+# use a heredoc to capture our testing script
+# << capture_this will perform shell expansion
+# << 'capture_this' will not perform shell expansion
+# preprocessor directives just need the '#' character to be the first non-whitespace character
+cat > "${cuda_test}" << 'capture_this'
+/* ============================================================================
+ * test for NVIDIA CUDA devices
+ * return 0 if 1 or more devices are found
+ * return 1 if no devices are found
+ *
+ * requires the CUDA toolkit to be installed, specifically nvcc and the
+ * cuda_runtime.h header - typically found under /usr/local/cuda on Linux
+ * ========================================================================= */
+
+#include <cuda_runtime.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    int num_devices = 0;
+    cudaError_t err = cudaGetDeviceCount(&num_devices);
+
+    if (err != cudaSuccess || num_devices == 0) {
+        printf("No CUDA devices found\n");
+        return 1;
+    }
+
+    printf("Found %d CUDA device(s)\n\n", num_devices);
+
+    for (int d = 0; d < num_devices; d++) {
+        struct cudaDeviceProp props;
+        cudaGetDeviceProperties(&props, d);
+        printf("Device %d: %s\n", d, props.name);
+        printf("  Compute Capability: %d.%d\n", props.major, props.minor);
+        printf("  Multiprocessors: %d\n", props.multiProcessorCount);
+        printf("  Global Memory: %.2f MB\n", props.totalGlobalMem / (1024.0 * 1024.0));
+        printf("  Max Threads Per Block: %d\n", props.maxThreadsPerBlock);
+        printf("  Warp Size: %d\n", props.warpSize);
+        printf("\n");
+    }
+    return 0;
+}
+capture_this
+
+# for the CUDA test to work, I need:
+# nvcc to be in the PATH
+# cuda_runtime.h to be accessible to nvcc
+# libcudart must be able to be found at runtime - it must be present in LD_LIBRARY_PATH
+# the device driver must be loaded and functional - nvcc can compile without it
+# but the compiled test binary cannot run without it
+# these need to happen sequentially-ish
+echo "Beginning CUDA tests..." >&2
+echo " " >&2
+command -v nvcc > /dev/null 2>&1
+nvcc_present=$?
+  
+if [ ${nvcc_present} -eq 0 ]; then
+  echo "nvcc found at $(command -v nvcc)" >&2
+  
+  # try and compile the CUDA test script
+  nvcc "${cuda_test}" \
+    ${alt_compiler:+--compiler-bindir "${alt_compiler}"} \
+    -o "${cuda_exec}" 2>"${dir01}/cuda_compile_err"
+  compilation_result=$?
+
+  if [ ${compilation_result} -eq 0 ]; then
+    echo "CUDA test script compiled without complaint." >&2
+    
+    # run ldd and capture its output
+    ldd "${cuda_exec}" > "${dir01}/cuda_ldd_out" 2>/dev/null
+    ldd_result=$?
+    
+    if [ ${ldd_result} -eq 0 ]; then
+      
+      grep -q "libcudart" "${dir01}/cuda_ldd_out"
+      parent_ldd_check=$?
+      if [ ${parent_ldd_check} -eq 0 ]; then
+      
+        grep "libcudart" "${dir01}/cuda_ldd_out" | grep -q "not found"
+        child_ldd_check=$?
+        
+        # this is the only place in the chain where success of the condition
+        # is the negative case!
+        if [ ${child_ldd_check} -ne 0 ]; then
+          echo "libcudart found by dynamic linker, attempting to run..." >&2
+          # now we can test the executable
+          "${cuda_exec}"
+          test_result=$?
+
+          if [ ${test_result} -eq 0 ]; then
+            echo "CUDA devices discovered." >&2
+            echo " " >&2
+            # make edits to makevars.in to compile CUDA tooling
+          else
+            echo "CUDA devices appear absent." >&2
+            echo " " >&2
+            exit 1
+          fi
+          
+        else
+          echo "binary is not linked to libcudart appropriately"
+          echo "is the CUDA lib64 directory in the LD_LIBRARY_PATH?"
+          cat "${dir01}/cuda_ldd_out"
+          echo " "
+          exit 1
+        fi
+        # end ldd check child
+        
+      else
+        # libcudart is absent from ldd output — check whether nvcc linked it
+        # statically, which is the default in CUDA 13.x and some earlier versions
+        nm "${cuda_exec}" 2>/dev/null | grep -q "cudaGetDeviceCount"
+        static_link_check=$?
+
+        if [ ${static_link_check} -eq 0 ]; then
+          echo "libcudart linked statically..." >&2
+          "${cuda_exec}"
+          test_result=$?
+
+          if [ ${test_result} -eq 0 ]; then
+            echo "CUDA devices discovered." >&2
+            echo " " >&2
+            # make edits to makevars.in to compile CUDA tooling
+          else
+            echo "CUDA devices appear absent." >&2
+            echo " " >&2
+            exit 1
+          fi
+        else
+          echo "libcudart is not referenced in the binary, this condition is unexpected" >&2
+          echo " " >&2
+          exit 1
+        fi
+      fi
+      # end ldd check parent
+    else
+      echo "ldd failed to inspect the compiled binary, this condition is unexpected" >&2
+      echo " " >&2
+      exit 1
+    fi
+    # end check for dynamic linker presence
+
+  else
+    echo "nvcc found but compilation failed — cuda_runtime.h may be missing or inaccessible." >&2
+    echo " " >&2
+    echo "Compiler errors:" >&2
+    cat "${dir01}/cuda_compile_err" >&2
+    echo " " >&2
+    exit 1
+  fi
+  # end of check for script compilation
+else
+  echo "nvcc not found" >&2
+  exit 1
+fi
+

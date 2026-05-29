@@ -1,0 +1,51 @@
+# Makevars for ACFcuda
+
+# prefer a user supplied CUDA home path, default to a reasonable expectation
+# otherwise
+CUDA_HOME ?= /usr/local/cuda
+
+# CUDA include and lib paths
+CUDA_INCLUDE = $(CUDA_HOME)/include
+CUDA_LIB = $(CUDA_HOME)/lib64
+
+# PKG_LIBS: link against CUDA runtime; -Wl,-rpath embeds the search path
+# so the package shared object can find libcudart at runtime without the
+# user setting LD_LIBRARY_PATH
+PKG_LIBS = -L$(CUDA_LIB) -lcudart -lcuda -Wl,-rpath,$(CUDA_LIB)
+
+# C preprocessor flags: include both the CUDA toolkit headers and the
+# package's own src/ directory (for ACFcuda.h)
+PKG_CPPFLAGS = -I. -I$(CUDA_INCLUDE)
+
+# C source files (compiled by R's default CC, typically gcc on non-macOS devices)
+SOURCES_C = buffers.c \
+            command.c \
+            devices.c \
+            runners.c \
+            utils.c \
+            R_init_ACFcuda.c
+
+# CUDA source files (compiled by nvcc, then linked)
+# none for now, and realistically, I'm not sure we should be shipping any?
+
+# Object files for both sets
+OBJECTS_C  = $(SOURCES_C:.c=.o)
+# for now we aren't sending kernels along, but if we do, this helps us
+# avoid name conflicts
+# OBJECTS_CU = $(SOURCES_CU:.cu=_cu.o)
+
+OBJECTS = $(OBJECTS_C)
+
+# nvcc flags:
+#   -O2 == optimize
+#   -Xcompiler == pass flags through to the host compiler
+#   -fPIC == required for shared objects
+#   --std=c++11 == nvcc wraps C++ even for extern "C" translation units
+#   -I. == find ACFcuda.h from src/
+#   -I$(CUDA_INCLUDE) == find cuda_runtime.h
+# NVCC_FLAGS = -O2 -Xcompiler -fPIC --std=c++11 -I. -I$(CUDA_INCLUDE)
+
+# should we need this ...
+# rule: compile each .cu into a _cu.o object via nvcc
+# %_cu.o: %.cu
+# 	$(NVCC) $(NVCC_FLAGS) -c $< -o $@

@@ -1,0 +1,18 @@
+# export functions to the local environment
+useDynLib(ACFcuda, .registration = TRUE)
+
+# imports
+importFrom("methods", "is")
+importFrom("utils",
+           "packageVersion")
+
+# device query
+export(cuda_is_available)
+export(cuda_device_count)
+export(cuda_device_information)
+
+# context
+export(cuda_make_context)
+
+# dispatch
+export(simple_cuda_wrapper)

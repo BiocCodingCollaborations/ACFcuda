@@ -1,0 +1,57 @@
+---
+title: "An exploratory package for calling NVIDA's CUDA runtime API"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
+    html_preview: false
+    keep_html: false
+---
+
+**Infrastructure for calling NVIDIA's CUDA runtime API from R**
+
+This package skeleton is meant to serve as a starting point for a hackathon project. Code chunks present here are guides for using NVIDIA's brev platform for deploying testing and development environments. A docker container built from rocker's RStudio container has been created to facilitate remote development on deployed resources. NVIDIA's brev resource also supports remove VScode access.
+
+Initial `brev` interactions.
+```{bash, include = TRUE, eval = FALSE}
+# Using defaults should pick the cheapest GPU
+brev create testinstance
+
+# log in to the instance you asked to created
+brev ssh testinstance
+
+# set up port forwarding to your device
+brev port-forward testinstance --port 8787:8787
+
+# check the instances you've created
+brev ls
+
+# delete the instance you created
+brev delete testinstance
+```
+
+On `brev` instances.
+```{bash, include = TRUE, eval = FALSE}
+
+# container interactive testing
+# inherit the host's .icd registry
+docker run -it --rm \
+  -v /etc/OpenCL/vendors/:/etc/OpenCL/vendors/ \
+  --gpus all \
+  npcooley/turkuhackathon:0.0.3 bash
+
+# spin up an RStudio server instance to allow remote login
+docker run -d \
+  -p 8787:8787 \
+  -e PASSWORD=thisisatest \
+  -v /etc/OpenCL/vendors/:/etc/OpenCL/vendors/ \
+  --gpus all \
+  --name testcontainer \
+  npcooley/turkuhackathon:0.0.3
+
+# log in to the RStudio server instance in your browser
+# http://localhost:8787
+
+```
+
