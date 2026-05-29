@@ -3,7 +3,7 @@
  * author: nicholas cooley
  * maintainer: nicholas cooley
  *
- * utility C functions: finalizers, type parsing, element size.
+ * utility C functions: finalizers, type parsing, element size, read in
  *
  * DESIGN NOTE vs ACFmetal/utils.c and utils.m:
  *   ACFmetal needs both a utils.c (R finalizer registration) and a utils.m
@@ -141,3 +141,64 @@ const char *cuda_type_name(CudaType type) {
   default:               return "unknown";
   }
 }
+
+// read_file_to_buffer is our helper to read ptx files in as character strings
+char *read_file_to_buffer(const char *path,
+                          char *err_buf,
+                          size_t err_buf_size) {
+  FILE *fh = fopen(path, "rb");
+  if (fh == NULL) {
+    snprintf(err_buf, err_buf_size,
+             "could not open PTX file for reading: %s", path);
+    return NULL;
+  }
+  
+  // get the file size
+  if (fseek(fh, 0L, SEEK_END) != 0) {
+    snprintf(err_buf, err_buf_size,
+             "fseek failed on PTX file: %s", path);
+    fclose(fh);
+    return NULL;
+  }
+  
+  long file_size = ftell(fh);
+  if (file_size < 0L) {
+    snprintf(err_buf, err_buf_size,
+             "ftell failed on PTX file: %s", path);
+    fclose(fh);
+    return NULL;
+  }
+  if (file_size == 0L) {
+    snprintf(err_buf, err_buf_size,
+             "PTX file is empty: %s", path);
+    fclose(fh);
+    return NULL;
+  }
+  
+  rewind(fh);
+  
+  // cuModuleLoadData expects a null terminator, allocate a buffer with space
+  // for that terminator
+  char *buf = (char *)malloc((size_t)file_size + 1);
+  if (buf == NULL) {
+    snprintf(err_buf, err_buf_size,
+             "failed to allocate %ld bytes for PTX buffer", file_size + 1);
+    fclose(fh);
+    return NULL;
+  }
+  
+  size_t bytes_read = fread(buf, 1, (size_t)file_size, fh);
+  fclose(fh);
+  
+  if ((long)bytes_read != file_size) {
+    snprintf(err_buf, err_buf_size,
+             "fread returned %zu bytes, expected %ld, for file: %s",
+             bytes_read, file_size, path);
+    free(buf);
+    return NULL;
+  }
+  
+  buf[file_size] = '\0';
+  return buf;
+}
+

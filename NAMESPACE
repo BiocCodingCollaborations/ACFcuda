@@ -11,6 +11,10 @@ export(cuda_is_available)
 export(cuda_device_count)
 export(cuda_device_information)
 
+# cuda function management
+export(cuda_source_to_ptx)
+export(cuda_kernel_from_ptx)
+
 # context
 export(cuda_make_context)
 

@@ -159,5 +159,9 @@ CudaType cuda_parse_type(const char *type_str);
 size_t cuda_get_element_size(CudaType type);
 const char *cuda_type_name(CudaType type);
 
+char *read_file_to_buffer(const char *path,
+                          char *err_buf,
+                          size_t err_buf_size)
+
 /* end header guard */
 #endif
