@@ -1,0 +1,33 @@
+An exploratory package for calling NVIDA’s CUDA runtime API
+================
+2026-05-29
+
+**Infrastructure for calling CUDA from R**
+
+Currently under construction…
+
+This package skeleton is meant to serve as a starting point for a
+hackathon project. Code chunks present here are guides for using
+NVIDIA’s brev platform for deploying testing and development
+environments. A docker container built from rocker’s RStudio container
+has been created to facilitate remote development on deployed resources.
+NVIDIA’s brev resource also supports remove VScode access.
+
+Initial `brev` interactions.
+
+``` bash
+# Using defaults should pick the cheapest GPU
+brev create testinstance
+
+# log in to the instance you asked to created
+brev ssh testinstance
+
+# set up port forwarding to your device
+brev port-forward testinstance --port 8787:8787
+
+# check the instances you've created
+brev ls
+
+# delete the instance you created
+brev delete testinstance
+```
