@@ -91,7 +91,7 @@ SEXP cuda_simple_runner(SEXP context_ptr,
   int output_length = LENGTH(output_template);
   
   int work_dims_curr[3] = {output_length, 1, 1};
-  // resolve work dims if supplied, else just default to the output length
+  // resolve work dims if supplied explicitly
   if (work_dims != R_NilValue) {
     if ((TYPEOF(work_dims) != REALSXP &&
         TYPEOF(work_dims) != INTSXP) ||
@@ -100,9 +100,21 @@ SEXP cuda_simple_runner(SEXP context_ptr,
     }
     for (int d = 0; d < 3; d++) {
       work_dims_curr[d] = (TYPEOF(work_dims) == REALSXP)
-                           ? (int)REAL(work_dims)[d]
-                           : INTEGER(work_dims)[d];
+      ? (int)REAL(work_dims)[d]
+      : INTEGER(work_dims)[d];
     }
+  } else {
+    // infer from dim attribute of output template if present
+    // a matrix carries dim = c(nrow, ncol), an array dim = c(d1, d2, d3)
+    // a plain vector has no dim attribute -- fall back to {output_length, 1, 1}
+    SEXP dims = getAttrib(output_template, R_DimSymbol);
+    if (dims != R_NilValue) {
+      int ndims = LENGTH(dims);
+      work_dims_curr[0] = (ndims >= 1) ? INTEGER(dims)[0] : output_length;
+      work_dims_curr[1] = (ndims >= 2) ? INTEGER(dims)[1] : 1;
+      work_dims_curr[2] = (ndims >= 3) ? INTEGER(dims)[2] : 1;
+    }
+    // else: already initialised to {output_length, 1, 1} above
   }
   
   // resolve block dimensions if supplied
