@@ -24,7 +24,7 @@
  * context_ptr == ptr container for device index
  * kernel_ptr == ptr container for the ptx function representation
  * arg_types == character vector
- * args_list == a list of R vectors, currently only supports integer and
+ * arg_list == a list of R vectors, currently only supports integer and
  *  numeric inputs
  * work_dims == NULL, or a vector of length 3
  * block_dims == NULL, or a vector of length 3
@@ -33,7 +33,7 @@
 SEXP cuda_simple_runner(SEXP context_ptr,
                         SEXP kernel_ptr,
                         SEXP arg_types,
-                        SEXP args_list,
+                        SEXP arg_list,
                         SEXP work_dims,
                         SEXP block_dims) {
   
@@ -68,28 +68,29 @@ SEXP cuda_simple_runner(SEXP context_ptr,
     Rf_error("'arg_types' must be a non-empty character vector");
   }
   if (TYPEOF(arg_list) != VECSXP) {
-    Rf_error("'args_list' must be an R list");
+    Rf_error("'arg_list' must be an R list");
   }
   if (LENGTH(arg_types) != LENGTH(arg_list)) {
-    Rf_error("length of 'arg_types' must equal length of 'args_list'");
+    Rf_error("length of 'arg_types' must equal length of 'arg_list'");
   }
   
   int total_args = LENGTH(arg_types);
-  int total_types = LENGTH(arg_types);
+  int total_types = LENGTH(arg_list);
   if (total_args != total_types) {
-    Rf_error("'arg_types' and 'arg_list' must be of equal length.")
+    Rf_error("'arg_types' and 'arg_list' must be of equal length.");
   }
   
   // output template
   SEXP output_template = VECTOR_ELT(arg_list, 0);
   if (TYPEOF(output_template) != REALSXP && TYPEOF(output_template) != INTSXP) {
-    Rf_error("first element of 'args_list' must be a numeric or integer vector representing the output template");
+    Rf_error("first element of 'arg_list' must be a numeric or integer vector representing the output template");
   }
   
   const char *first_type_str = CHAR(STRING_ELT(arg_types, 0));
   CudaType output_type = cuda_parse_type(first_type_str);
   int output_length = LENGTH(output_template);
   
+  int work_dims_curr[3] = {output_length, 1, 1};
   // resolve work dims if supplied, else just default to the output length
   if (work_dims != R_NilValue) {
     if ((TYPEOF(work_dims) != REALSXP &&
@@ -97,38 +98,38 @@ SEXP cuda_simple_runner(SEXP context_ptr,
         LENGTH(work_dims) != 3) {
       Rf_error("'work_dims' must be a numeric or integer vector of length 3");
     }
-    int work_dims[3] = {output_length, 1, 1};
     for (int d = 0; d < 3; d++) {
-      work_dims[d] = (TYPEOF(work_dims) == REALSXP)
-      ? (int)REAL(work_dims)[d]
-      : INTEGER(work_dims)[d];
+      work_dims_curr[d] = (TYPEOF(work_dims) == REALSXP)
+                           ? (int)REAL(work_dims)[d]
+                           : INTEGER(work_dims)[d];
     }
-  } else {
-    int work_dims[3] = {output_length, 1, 1};
   }
   
   // resolve block dimensions if supplied
   // default block dims are a little more complicated and are based on the work
   // dims
   
+  int block_dims_curr[3] = {256, 1, 1};
   if (block_dims != R_NilValue) {
     if ((TYPEOF(block_dims) != REALSXP &&
         TYPEOF(block_dims) != INTSXP) ||
         LENGTH(block_dims) != 3) {
       Rf_error("'block_dims' must be a numeric or integer vector of length 3");
     }
-    int block_dims[3] = {256, 1, 1};
     for (int d = 0; d < 3; d++) {
-      block_dims[d] = (TYPEOF(block_dims) == REALSXP)
-      ? (int)REAL(block_dims)[d]
-      : INTEGER(block_dims)[d];
+      block_dims_curr[d] = (TYPEOF(block_dims) == REALSXP)
+                            ? (int)REAL(block_dims)[d]
+                            : INTEGER(block_dims)[d];
     }
   } else {
-    int block_dims[3] = {256, 1, 1};
-    if (work_dims[2] > 1) {
-      block_dims[0] = 8;  block_dims[1] = 8;  block_dims[2] = 4;
-    } else if (work_dims[1] > 1) {
-      block_dims[0] = 16; block_dims[1] = 16; block_dims[2] = 1;
+    if (work_dims_curr[2] > 1) {
+      block_dims_curr[0] = 8; 
+      block_dims_curr[1] = 8; 
+      block_dims_curr[2] = 4;
+    } else if (work_dims_curr[1] > 1) {
+      block_dims_curr[0] = 16;
+      block_dims_curr[1] = 16;
+      block_dims_curr[2] = 1;
     }
     // ending else condition already covered...
   }
@@ -136,8 +137,10 @@ SEXP cuda_simple_runner(SEXP context_ptr,
   // compute grid dimensions
   int grid_dims[3];
   for (int d = 0; d < 3; d++) {
-    grid_dims[d] = (work_dims[d] + block_dims[d] - 1) / block_dims[d];
-    if (grid_dims[d] < 1) { grid_dims[d] = 1; }
+    grid_dims[d] = (work_dims_curr[d] + block_dims_curr[d] - 1) / block_dims_curr[d];
+    if (grid_dims[d] < 1) {
+      grid_dims[d] = 1;
+    }
   }
   
   // count up buffers and scalars
@@ -380,9 +383,9 @@ SEXP cuda_simple_runner(SEXP context_ptr,
                                        (unsigned int)grid_dims[0],
                                        (unsigned int)grid_dims[1],
                                        (unsigned int)grid_dims[2],
-                                       (unsigned int)block_dims[0],
-                                       (unsigned int)block_dims[1],
-                                       (unsigned int)block_dims[2],
+                                       (unsigned int)block_dims_curr[0],
+                                       (unsigned int)block_dims_curr[1],
+                                       (unsigned int)block_dims_curr[2],
                                        0,
                                        (CUstream)ctx->stream,
                                        kernel_params,

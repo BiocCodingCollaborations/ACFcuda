@@ -160,7 +160,12 @@ void cuda_register_kernel(const char *name,
                           CudaLauncherFn launcher,
                           int max_threads_per_block);
 
-attribute_visible SEXP cuda_simple_runner(SEXP args);
+attribute_visible SEXP cuda_simple_runner(SEXP context_ptr,
+                                          SEXP kernel_ptr,
+                                          SEXP arg_types,
+                                          SEXP args_list,
+                                          SEXP work_dims,
+                                          SEXP block_dims);
 
 /* ============================================================================
  * utils.c
