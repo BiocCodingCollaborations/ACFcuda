@@ -29,7 +29,7 @@
   }
 }
 \details{
-  Create a ptx representation of a .cu file.
+  Create a ptx representation of a .cu file. If the environment variable \code{AC_ALT_COMPILER} is set, it will be passed to \code{nvcc}'s \code{--compiler-bindir} argument in an analogous manner to the tests run in this package's config script.
 }
 \value{
   Invisibly returns the stderr and stdout of \code{nvcc}
@@ -43,5 +43,5 @@
   Nicholas Cooley
 }
 \examples{
-# no example here for now
+# no examples yet...
 }

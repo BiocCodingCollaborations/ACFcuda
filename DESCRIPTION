@@ -13,7 +13,7 @@ Description: Minimal and robust infrastructure for integrating CUDA GPU accelera
 Imports: methods
 Suggests: knitr, rmarkdown
 VignetteBuilder: knitr
-License: MIT + file LICENSE
+License: Artistic-2.0
 SystemRequirements: NVIDIA CUDA Toolkit (>= 11.0), CUDA-capable GPU
 Depends: R (>= 4.5.0)
 NeedsCompilation: yes

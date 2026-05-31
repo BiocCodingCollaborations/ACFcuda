@@ -6,6 +6,9 @@
 # force '-ptx' flag in nvcc command for now, once this can be revisited, this
 # mechanism should adjusted to be more robust
 
+# this needs to mirror the invocation in the config file, meaning it also has
+# to respect AC_ALT_COMPILER if its present
+
 ###### -- FUNCTION ------------------------------------------------------------
 
 cuda_source_to_ptx <- function(cuda_file,
@@ -53,19 +56,42 @@ cuda_source_to_ptx <- function(cuda_file,
     nvcc_command <- nvcc_alt
   }
   
+  alt_compiler_flag <- Sys.getenv("AC_ALT_COMPILER")
+  
   if (missing(nvcc_args)) {
-    # when args aren't specified, just ignore
-    nvcc_args <- paste(cuda_file,
-                       "-ptx",
-                       "-o",
-                       ptx_file)
+    if (nchar(alt_compiler_flag) == 0) {
+      # when args aren't specified, just ignore
+      nvcc_args <- paste(cuda_file,
+                         "-ptx",
+                         "-o",
+                         ptx_file)
+    } else {
+      # when args aren't specified, just ignore
+      nvcc_args <- paste(cuda_file,
+                         "--compiler-bindir",
+                         alt_compiler_flag,
+                         "-ptx",
+                         "-o",
+                         ptx_file)
+    }
   } else {
     # if args are specified include them
-    nvcc_args <- paste(cuda_file,
-                       "-ptx",
-                       nvcc_args,
-                       "-o",
-                       ptx_file)
+    if (nchar(alt_compiler_flag) == 0) {
+      nvcc_args <- paste(cuda_file,
+                         "-ptx",
+                         nvcc_args,
+                         "-o",
+                         ptx_file)
+    } else {
+      nvcc_args <- paste(cuda_file,
+                         "--compiler-bindir",
+                         alt_compiler_flag,
+                         "-ptx",
+                         nvcc_args,
+                         "-o",
+                         ptx_file)
+    }
+    
   }
   res <- system2(command = nvcc_command,
                  args = nvcc_args,
