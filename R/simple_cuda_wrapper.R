@@ -28,13 +28,14 @@ simple_cuda_wrapper <- function(context_pointer,
                  'ushort',
                  'uint',
                  'ulong')
-
+  
+  # these are checks of CLASS, not of TYPE
   if (!is(object = context_pointer,
-          class2 = "externalptr")) {
+          class2 = "cudaContext")) {
     stop("'context_pointer' must be an externalptr object from cuda_make_context()")
   }
   if (!is(object = kernel_pointer,
-          class2 = "externalptr")) {
+          class2 = "cudaKernel")) {
     stop("'kernel_pointer' must be an externalptr object from cuda_kernel_from_ptx()")
   }
   if (length(arg_types) < 1L) {
@@ -72,6 +73,8 @@ simple_cuda_wrapper <- function(context_pointer,
                  kernel_pointer,
                  arg_types,
                  arg_list,
+                 work_dims = NULL,
+                 block_dims = NULL,
                  PACKAGE = "ACFcuda")
   } else {
     res <- .Call("cuda_simple_runner",

@@ -27,6 +27,7 @@ static const R_CallMethodDef callMethods[] = {
   CALL_DEF(c_cuda_device_information, 1),
   CALL_DEF(c_cuda_make_context, 2),
   CALL_DEF(cuda_simple_runner, 6),
+  CALL_DEF(c_cuda_kernel_from_ptx, 3),
   {NULL, NULL, 0}
 };
 
