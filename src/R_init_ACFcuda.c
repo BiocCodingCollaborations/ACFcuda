@@ -13,9 +13,9 @@
 #include <Rinternals.h>
 #include "ACFcuda.h"
 
-/* convenience macros -- originally from Aidan Lakshman */
+// convenience macros lifted from AHL
 #define CALL_DEF(name, n) {#name, (DL_FUNC) &name, n}
-#define EXTERNAL_DEF(name, n) {#name, (DL_FUNC) &name, n}
+// #define EXTERNAL_DEF(name, n) {#name, (DL_FUNC) &name, n}
 
 /* ============================================================================
  * .Call registration table
@@ -26,6 +26,7 @@ static const R_CallMethodDef callMethods[] = {
   CALL_DEF(c_cuda_device_count, 0),
   CALL_DEF(c_cuda_device_information, 1),
   CALL_DEF(c_cuda_make_context, 2),
+  CALL_DEF(cuda_simple_runner, 6),
   {NULL, NULL, 0}
 };
 
@@ -33,17 +34,14 @@ static const R_CallMethodDef callMethods[] = {
  * .External registration table
  * ========================================================================= */
 
-static const R_ExternalMethodDef externalMethods[] = {
-  EXTERNAL_DEF(cuda_simple_runner, -1),
-  {NULL, NULL, 0}
-};
+// empty for now ...
 
 /* ============================================================================
  * package initialization
  * ========================================================================= */
 
 void R_init_ACFcuda(DllInfo *info) {
-  R_registerRoutines(info, NULL, callMethods, NULL, externalMethods);
+  R_registerRoutines(info, NULL, callMethods, NULL, NULL);
   R_useDynamicSymbols(info, FALSE);
 
 }

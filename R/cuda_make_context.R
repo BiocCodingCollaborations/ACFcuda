@@ -24,7 +24,7 @@
 ###### -- FUNCTION ------------------------------------------------------------
 
 cuda_make_context <- function(device_index = 0L,
-                               use_default_stream = FALSE) {
+                              use_default_stream = FALSE) {
 
   if (!is(object = device_index,
           class2 = "numeric") &&

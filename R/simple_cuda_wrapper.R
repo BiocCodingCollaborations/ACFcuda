@@ -3,64 +3,39 @@
 # maintainer: nicholas cooley
 
 ###### -- NOTES ---------------------------------------------------------------
-# R wrapper for cuda_simple_runner
-# requires:
-#   cuda_context  -- a cudaContext externalptr from cuda_make_context()
-#   kernel_name   -- character scalar naming a registered kernel
-#   arg_types     -- character vector; one entry per value in ...
-#   ...           -- numeric or integer vectors to pass to the kernel
-# returns:
-#   numeric vector containing the contents of the output buffer after dispatch
+# this wrapper will enfoce that if one of work_dims/block_dims is supplied, both
+# must be, but that is not the case in the R callable C function...
 
-###### -- DESIGN NOTE vs simple_metal_wrapper() -------------------------------
-#
-# simple_metal_wrapper() receives a function *pointer* (an externalptr to an
-# MTLFunction) as its second argument.  the Metal pipeline is compiled from
-# that pointer on each dispatch inside the runner.
-#
-# simple_cuda_wrapper() receives a *name string* instead.  CUDA kernels are
-# compiled into the package binary by nvcc at build time; there is no runtime
-# object to retrieve by path.  the runner looks up the name in the package's
-# static kernel registry (populated at load time by cuda_register_kernel())
-# and calls the matching launcher shim.  this replaces the entire
-# metal_functions_to_library / metal_get_library_pointer /
-# metal_get_function_from_library / pipeline-creation chain from ACFmetal.
-#
-# the keyword sentinel vocabulary is otherwise identical to ACFmetal with one
-# rename: THREADGROUPS -> BLOCKDIMS, which matches CUDA's terminology.
-#
-# kernel argument layout (mirrors simple_metal_wrapper):
-#   - the first vector in ... is always the output buffer (template)
-#   - subsequent vectors are input arguments in the order the kernel expects
-#   - a length-3 vector typed "WORKDIMS"  overrides the total thread grid
-#   - a length-3 vector typed "BLOCKDIMS" overrides threads per block
-#     (default: c(256, 1, 1) for 1D; c(16, 16, 1) for 2D; c(8, 8, 4) for 3D)
+# we're just wrapping the c function in a bunch of R facing checks here
 
 ###### -- FUNCTION ------------------------------------------------------------
 
-simple_cuda_wrapper <- function(cuda_context,
-                                 kernel_name,
-                                 arg_types,
-                                 ...) {
-
-  # containerize the variadic arguments
-  vals <- list(...)
+simple_cuda_wrapper <- function(context_pointer,
+                                kernel_pointer,
+                                arg_types,
+                                arg_list,
+                                work_dims = NULL,
+                                block_dims = NULL) {
 
   # hard-coded accepted type strings -- kept in sync with cuda_parse_type()
-  type_mode <- c('float', 'double', 'char', 'short',
-                 'int', 'long', 'uchar', 'ushort',
-                 'uint', 'ulong', 'WORKDIMS', 'BLOCKDIMS')
+  type_mode <- c('float',
+                 'double',
+                 'char',
+                 'short',
+                 'int',
+                 'long',
+                 'uchar',
+                 'ushort',
+                 'uint',
+                 'ulong')
 
-  if (!is(object = cuda_context,
+  if (!is(object = context_pointer,
           class2 = "externalptr")) {
-    stop("'cuda_context' must be an externalptr object from cuda_make_context()")
+    stop("'context_pointer' must be an externalptr object from cuda_make_context()")
   }
-  if (!is(object = kernel_name,
-          class2 = "character") || length(kernel_name) != 1L) {
-    stop("'kernel_name' must be a character scalar")
-  }
-  if (nchar(kernel_name) == 0L) {
-    stop("'kernel_name' must not be an empty string")
+  if (!is(object = kernel_pointer,
+          class2 = "externalptr")) {
+    stop("'kernel_pointer' must be an externalptr object from cuda_kernel_from_ptx()")
   }
   if (length(arg_types) < 1L) {
     stop("'arg_types' must be a character vector of length 1 or greater")
@@ -69,7 +44,7 @@ simple_cuda_wrapper <- function(cuda_context,
           class2 = "character")) {
     stop("'arg_types' must be a character vector")
   }
-  if (length(arg_types) != length(vals)) {
+  if (length(arg_types) != length(arg_list)) {
     stop("length of 'arg_types' must equal the number of vectors supplied in '...'")
   }
   if (any(!(arg_types %in% type_mode))) {
@@ -79,12 +54,35 @@ simple_cuda_wrapper <- function(cuda_context,
          "; accepted types are: ",
          paste0("'", type_mode, "'", collapse = ", "))
   }
-
-  res <- .External("cuda_simple_runner",
-                   cuda_context,
-                   kernel_name,
-                   arg_types,
-                   ...,
-                   PACKAGE = "ACFcuda")
+  if ((is.null(work_dims) & !is.null(block_dims)) |
+      (!is.null(work_dims) & is.null(block_dims))) {
+    stop("if one of 'work_dims' or 'block_dims' is specified, so must the other")
+  }
+  if (!is.null(work_dims)) {
+    if (length(work_dims) !=3 |
+        length(block_dims) != 3 |
+        !is.integer(work_dims) |
+        !is.integer(block_dims)) {
+      stop("'work_dims' and 'block_dims' must both be integers of length three if either is supplied")
+    }
+  }
+  if (is.null(work_dims)) {
+    res <- .Call("cuda_simple_runner",
+                 context_pointer,
+                 kernel_pointer,
+                 arg_types,
+                 arg_list,
+                 PACKAGE = "ACFcuda")
+  } else {
+    res <- .Call("cuda_simple_runner",
+                 context_pointer,
+                 kernel_pointer,
+                 arg_types,
+                 arg_list,
+                 work_dims = work_dims,
+                 block_dims = block_dims,
+                 PACKAGE = "ACFcuda")
+  }
+  
   return(res)
 }

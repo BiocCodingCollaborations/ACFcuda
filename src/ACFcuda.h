@@ -156,10 +156,6 @@ attribute_visible SEXP c_cuda_kernel_from_ptx(SEXP cuda_context_sexp,
  * kernel registry and .External dispatch entry point
  * ========================================================================= */
 
-void cuda_register_kernel(const char *name,
-                          CudaLauncherFn launcher,
-                          int max_threads_per_block);
-
 attribute_visible SEXP cuda_simple_runner(SEXP context_ptr,
                                           SEXP kernel_ptr,
                                           SEXP arg_types,
